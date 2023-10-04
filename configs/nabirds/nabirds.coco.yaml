@@ -1,0 +1,67 @@
+AUGMENT:
+  MULT_MIN_SIZE_TRAIN: (640,720,800,960,1024)
+DATALOADER:
+  ASPECT_RATIO_GROUPING: false
+  DISTRIBUTE_CHUNK_AMONG_NODE: false
+  NUM_WORKERS: 4
+  SIZE_DIVISIBILITY: 32
+DATASETS:
+  DISABLE_SHUFFLE: false
+  OVERRIDE_CATEGORY: '[{"name": "bird", "id": 1}, {"name": "bill", "id": 2}, {"name":
+    "crown", "id": 3}, {"name": "nape", "id": 4}, {"name": "left eye", "id": 5}, {"name":
+    "right eye", "id": 6}, {"name": "belly", "id": 7}, {"name": "breast", "id": 8},
+    {"name": "back", "id": 9}, {"name": "tail", "id": 10}, {"name": "left wing", "id":
+    11}, {"name": "right wing", "id": 12}]'
+  REGISTER:
+    nab_test:
+      ann_file: bird_part_side_40_validation_full_attributes_captions_token_list-20221205111621/data/test.json
+      img_dir: nabirds/data
+    nab_train:
+      ann_file: part_side_40_validation_full_attributes_captions_token_list-20230208083109/data/train.json
+      img_dir: nabirds/data
+    nab_val:
+      ann_file: /bird_part_side_40_validation_full_attributes_captions_token_list-20221205111621/data/val.json
+      img_dir: nabirds/data
+  SHUFFLE_SEED: 42
+  TEST: ("nab_val",)
+  TEST_DATASETNAME_SUFFIX: _grounding
+  TEST_DISABLE_SHUFFLE: true
+  TRAIN: ("nab_train",)
+  TRAIN_DATASETNAME_SUFFIX: _grounding
+  USE_CAPTION_PROMPT: true
+  USE_OVERRIDE_CATEGORY: false
+INPUT:
+  MAX_SIZE_TEST: 1024
+  MAX_SIZE_TRAIN: 1024
+  MIN_SIZE_TEST: 800
+  MIN_SIZE_TRAIN: 800
+MODEL:
+  ATSS:
+    NUM_CLASSES: 13
+  DYHEAD:
+    NUM_CLASSES: 13
+    USE_CHECKPOINT: true
+  FCOS:
+    NUM_CLASSES: 13
+  ROI_BOX_HEAD:
+    NUM_CLASSES: 13
+SOLVER:
+  AUTO_TERMINATE_PATIENCE: 10
+  CHECKPOINT_PERIOD: 100
+  CHECKPOINT_PER_EPOCH: 1.0
+  FIND_UNUSED_PARAMETERS: false
+  MIN_LR: 1e-7
+  MODEL_EMA: 0.0
+  SEED: 10
+  STEP_PATIENCE: 3
+  TEST_WITH_INFERENCE: true
+  TUNING_HIGHLEVEL_OVERRIDE: full
+  USE_AMP: true
+  USE_AUTOSTEP: true
+  USE_EMA_FOR_MONITOR: false
+  WARMUP_ITERS: 500
+  WEIGHT_DECAY: 0.05
+TEST:
+  DURING_TRAINING: true
+  EVAL_TASK: grounding
+  IMS_PER_BATCH: 1

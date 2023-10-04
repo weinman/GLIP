@@ -4,7 +4,28 @@
 
 This fork contains the GLIPv1-L modifications used to train the atributes-enhanced model for the paper:
 
-Weinman, J., Belongie, S., Frank, S. (2023). Descriptive Attributes for Language-Based Object Keypoint Detection. In: Christensen, H.I., Corke, P., Detry, R., Weibel, JB., Vincze, M. (eds) Computer Vision Systems. ICVS 2023. Lecture Notes in Computer Science, vol 14253. Springer, Cham. https://doi.org/10.1007/978-3-031-44137-0_37
+    Weinman, J., Belongie, S., Frank, S. (2023). Descriptive Attributes for Language-Based Object Keypoint Detection. In: Christensen, H.I., Corke, P., Detry, R., Weibel, JB., Vincze, M. (eds) Computer Vision Systems. ICVS 2023. Lecture Notes in Computer Science, vol 14253. Springer, Cham. https://doi.org/10.1007/978-3-031-44137-0_37
+
+The network was trained with the following command:
+
+```
+python tools/finetune.py           \
+    --config-file    configs/pretrain/glip_Swin_L.yaml                           \
+    --ft-tasks       configs/nabirds/nabirds.coco.yaml                           \
+    --skip-test                                                                  \
+    --custom_shot_and_epoch_and_general_copy  0_200_1                            \
+    --evaluate_only_best_on_test                                                 \
+    --push_both_val_and_test                                                     \
+    --use_tensorboard                                                            \
+    OUTPUT_DIR                                data                               \
+    MODEL.WEIGHT                              ${WEIGHTS}/glip_large_model.pth    \
+    MODEL.BACKBONE.FREEZE_CONV_BODY_AT        2                                  \
+    SOLVER.IMS_PER_BATCH                      3                                  \
+    SOLVER.MAX_EPOCH                          64                                 \
+    SOLVER.BASE_LR                            1e-5                               \
+    SOLVER.LANG_LR                            1e-5                               \
+    SOLVER.GAMMA                              5e-1
+```
 
 <img src="docs/lead.png" width="800"> 
 
