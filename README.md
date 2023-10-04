@@ -1,5 +1,11 @@
 # GLIP: Grounded Language-Image Pre-training  
 
+## Modifications for ICVS23 paper
+
+This fork contains the GLIPv1-L modifications used to train the atributes-enhanced model for the paper:
+
+Weinman, J., Belongie, S., Frank, S. (2023). Descriptive Attributes for Language-Based Object Keypoint Detection. In: Christensen, H.I., Corke, P., Detry, R., Weibel, JB., Vincze, M. (eds) Computer Vision Systems. ICVS 2023. Lecture Notes in Computer Science, vol 14253. Springer, Cham. https://doi.org/10.1007/978-3-031-44137-0_37
+
 <img src="docs/lead.png" width="800"> 
 
 
