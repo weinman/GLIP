@@ -27,6 +27,8 @@ python tools/finetune.py           \
     SOLVER.GAMMA                              5e-1
 ```
 
+The [attributes annotation data](https://weinman.cs.grinnell.edu/research/vlkp.shtml#data) and the original [NABirds data](https://dl.allaboutbirds.org/nabirds) (for the images).
+
 Use of this derivative work may cite the following paper (in addition to the original):
 
 ```
