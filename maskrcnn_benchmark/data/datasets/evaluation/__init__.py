@@ -21,7 +21,8 @@ def evaluate(dataset, predictions, output_folder, **kwargs):
     args = dict(
         dataset=dataset, predictions=predictions, output_folder=output_folder, **kwargs
     )
-    if isinstance(dataset, datasets.COCODataset) or isinstance(dataset, datasets.TSVDataset):
+    if isinstance(dataset, datasets.COCODataset) or isinstance(dataset, datasets.TSVDataset) \
+       or isinstance(dataset,datasets.CocoGrounding):
         return coco_evaluation(**args)
     # elif isinstance(dataset, datasets.VGTSVDataset):
     #     return vg_evaluation(**args)

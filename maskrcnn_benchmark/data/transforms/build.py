@@ -33,13 +33,22 @@ def build_transforms(cfg, is_train=True):
     normalize_transform = T.Normalize(
         mean=cfg.INPUT.PIXEL_MEAN, std=cfg.INPUT.PIXEL_STD, format=input_format
     )
- 
-    transform = T.Compose(
-        [
-            T.Resize(min_size, max_size, restrict=fix_res),
-            T.RandomHorizontalFlip(flip_horizontal_prob),
-            T.ToTensor(),
-            normalize_transform,
-        ]
-    )
+
+    if is_train:
+        transform = T.Compose(
+            [
+                T.Resize(min_size, max_size, restrict=fix_res),
+                T.RandomHorizontalFlip(flip_horizontal_prob),
+                T.ToTensor(),
+                normalize_transform,
+            ]
+        )
+    else:
+        transform = T.Compose(
+            [
+                T.ToTensor(),
+                normalize_transform,
+            ]
+        )
+
     return transform

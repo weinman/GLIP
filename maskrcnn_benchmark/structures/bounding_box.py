@@ -181,6 +181,17 @@ class BoxList(object):
             if not isinstance(v, torch.Tensor):
                 v = v.transpose(method)
             bbox.add_field(k, v)
+
+        # TODO(jjw) make this less a total hack
+        labels = bbox.extra_fields['labels']
+        labels_flip = labels.clone()
+        labels_flip[labels==5] = 6 # left eye --> right eye
+        labels_flip[labels==6] = 5 # right eye --> left eye
+        labels_flip[labels==11] = 12  # left wing --> right wing
+        labels_flip[labels==12] = 11  # right wing --> left wing
+
+        bbox.extra_fields['labels'] = labels_flip
+
         return bbox.convert(self.mode)
 
     def crop(self, box):

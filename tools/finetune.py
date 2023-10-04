@@ -44,7 +44,8 @@ def removekey(d, prefix):
     return r
 
 
-def train(cfg, local_rank, distributed, zero_shot, skip_optimizer_resume=False, save_config_path = None):
+def train(cfg, local_rank, distributed, zero_shot, skip_optimizer_resume=False, save_config_path = None,
+          use_tensorboard=False):
 
     data_loader = make_data_loader(
         cfg,
@@ -120,7 +121,23 @@ def train(cfg, local_rank, distributed, zero_shot, skip_optimizer_resume=False, 
         checkpointer._load_model(state_dict)
 
     checkpoint_period = cfg.SOLVER.CHECKPOINT_PERIOD
-    meters = MetricLogger(delimiter="  ")
+
+    if use_tensorboard:
+        meters = TensorboardLogger(
+            log_dir=cfg.OUTPUT_DIR,
+            start_iter=arguments["iteration"],
+            delimiter="  "
+        )
+        meters_val = TensorboardLogger(
+            log_dir=os.path.join(cfg.OUTPUT_DIR,'eval'),
+            start_iter=1,
+            delimiter="  "
+        )
+
+    else:
+        meters = MetricLogger(delimiter="  ")
+        meters_val = MetricLogger(delimiter="  ")
+
 
     if zero_shot:
         return model
@@ -156,7 +173,6 @@ def train(cfg, local_rank, distributed, zero_shot, skip_optimizer_resume=False, 
             arguments,
         )
     else:
-        meters = MetricLogger(delimiter="  ")
         do_train(
             cfg,
             model,
@@ -168,7 +184,8 @@ def train(cfg, local_rank, distributed, zero_shot, skip_optimizer_resume=False, 
             checkpoint_period,
             arguments,
             data_loaders_val,
-            meters=meters
+            meters=meters,
+            meters_val=meters_val
         )
 
     return model
@@ -317,6 +334,13 @@ def main():
 
     parser.add_argument("--keep_testing", action="store_true")
 
+    parser.add_argument("--use_tensorboard",
+                        dest="use_tensorboard",
+                        help="Use tensorboardX logger (Requires tensorboardX installed)",
+                        action="store_true",
+                        default=False
+                        )
+
     args = parser.parse_args()
 
     num_gpus = int(os.environ["WORLD_SIZE"]) if "WORLD_SIZE" in os.environ else 1
@@ -442,7 +466,8 @@ def main():
                     args.distributed, 
                     args.skip_train or custom_shot == 10000, 
                     skip_optimizer_resume=args.skip_optimizer_resume,
-                    save_config_path=output_config_path)
+                    save_config_path=output_config_path,
+                    use_tensorboard=args.use_tensorboard)
                 
                 if not args.skip_test:
                     test(cfg_, model, args.distributed)

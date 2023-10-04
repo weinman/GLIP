@@ -54,6 +54,7 @@ def do_train(
         arguments,
         val_data_loader=None,
         meters=None,
+        meters_val=None,
         zero_shot=False
 ):
     logger = logging.getLogger("maskrcnn_benchmark.trainer")
@@ -207,14 +208,13 @@ def do_train(
         # reduce losses over all GPUs for logging purposes
         loss_dict_reduced = reduce_loss_dict(loss_dict)
         losses_reduced = sum(loss for loss in loss_dict_reduced.values())
-        meters.update(loss=losses_reduced, **loss_dict_reduced)
         if model_ema is not None:
             model_ema.update(model)
             arguments["model_ema"] = model_ema.state_dict()
 
         batch_time = time.time() - end
         end = time.time()
-        meters.update(time=batch_time, data=data_time)
+        meters.update(time=batch_time, data=data_time,loss=losses_reduced, **loss_dict_reduced)
         eta_seconds = meters.time.global_avg * (max_iter - iteration)
         eta_string = str(datetime.timedelta(seconds=int(eta_seconds)))
 
@@ -327,6 +327,20 @@ def do_train(
                 
             arguments.update(eval_result=eval_result)
 
+            if meters_val:
+                meters_val.update(eval=eval_result)
+                print(
+                    meters_val.delimiter.join(
+                        [
+                            "[Validation]",
+                            "iter: {iter}",
+                            "{meters}",
+                        ]
+                    ).format(
+                        iter=iteration,
+                        meters=str(meters_val),
+                    )
+                )
             if cfg.SOLVER.USE_AUTOSTEP:
                 eval_result = all_gather(eval_result)[0] #broadcast_data([eval_result])[0]
                 # print("Rank {} eval result gathered".format(cfg.local_rank), eval_result)

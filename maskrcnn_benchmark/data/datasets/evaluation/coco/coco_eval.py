@@ -381,7 +381,7 @@ def evaluate_predictions_on_coco(
         json.dump(coco_results, f)
 
     from pycocotools.coco import COCO
-    from pycocotools.cocoeval import COCOeval
+    from birdparts.cocokpeval import COCOeval
 
     coco_dt = coco_gt.loadRes(str(json_result_file)) if coco_results else COCO()
 
@@ -403,23 +403,23 @@ def summarize_per_category(coco_eval, csv_output=None):
     Note this functin can *only* be applied on the default parameter setting
     '''
 
-    def _summarize(iouThr=None, areaRng='all', maxDets=100):
+    def _summarize(oksThr=None, areaRng='all', maxDets=100):
         p = coco_eval.params
         titleStr = 'Average Precision'
         typeStr = '(AP)'
-        iouStr = '{:0.2f}:{:0.2f}'.format(p.iouThrs[0], p.iouThrs[-1]) \
-            if iouThr is None else '{:0.2f}'.format(iouThr)
-        result_str = ' {:<18} {} @[ IoU={:<9} | area={:>6s} | maxDets={:>3d} ], '. \
-            format(titleStr, typeStr, iouStr, areaRng, maxDets)
+        oksStr = '{:0.2f}:{:0.2f}'.format(p.oksThrs[0], p.oksThrs[-1]) \
+            if oksThr is None else '{:0.2f}'.format(oksThr)
+        result_str = ' {:<18} {} @[ sim={:<9} | area={:>6s} | maxDets={:>3d} ], '. \
+            format(titleStr, typeStr, oksStr, areaRng, maxDets)
 
         aind = [i for i, aRng in enumerate(p.areaRngLbl) if aRng == areaRng]
         mind = [i for i, mDet in enumerate(p.maxDets) if mDet == maxDets]
 
         # dimension of precision: [TxRxKxAxM]
         s = coco_eval.eval['precision']
-        # IoU
-        if iouThr is not None:
-            t = np.where(iouThr == p.iouThrs)[0]
+        # IoU --> OKS (Object Keypoint Similarity)
+        if oksThr is not None:
+            t = np.where(oksThr == p.oksThrs)[0]
             s = s[t]
         s = s[:, :, :, aind, mind]
 
@@ -428,7 +428,7 @@ def summarize_per_category(coco_eval, csv_output=None):
         else:
             mean_s = np.mean(s[s > -1])
             # cacluate AP(average precision) for each category
-            num_classes = len(p.catIds)
+            num_classes = len(p.catIds)-1 # bird class omitted from evaluation
             avg_ap = 0.0
             for i in range(0, num_classes):
                 result_str += '{}, '.format(np.mean(s[:, :, i, :]))
@@ -446,7 +446,7 @@ def summarize_per_category(coco_eval, csv_output=None):
 
     results = [title_str]
     results.append(_summarize())
-    results.append(_summarize(iouThr=.5, maxDets=coco_eval.params.maxDets[2]))
+    results.append(_summarize(oksThr=.5, maxDets=coco_eval.params.maxDets[2]))
     results.append(_summarize(areaRng='small', maxDets=coco_eval.params.maxDets[2]))
     results.append(_summarize(areaRng='medium', maxDets=coco_eval.params.maxDets[2]))
     results.append(_summarize(areaRng='large', maxDets=coco_eval.params.maxDets[2]))
@@ -494,13 +494,13 @@ class COCOResults(object):
     def update(self, coco_eval):
         if coco_eval is None:
             return
-        from pycocotools.cocoeval import COCOeval
+        from birdparts.cocokpeval import COCOeval
 
-        assert isinstance(coco_eval, COCOeval)
+        assert isinstance(coco_eval, COCOeval), "type(coco_eval)"+type(coco_eval)
         s = coco_eval.stats
-        iou_type = coco_eval.params.iouType
-        res = self.results[iou_type]
-        metrics = COCOResults.METRICS[iou_type]
+        oks_type = coco_eval.params.oksType
+        res = self.results[oks_type]
+        metrics = COCOResults.METRICS[oks_type]
         for idx, metric in enumerate(metrics):
             res[metric] = s[idx]
 

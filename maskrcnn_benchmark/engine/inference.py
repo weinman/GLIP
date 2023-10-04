@@ -16,9 +16,14 @@ from ..utils.comm import synchronize
 import pdb
 from maskrcnn_benchmark.data.datasets.evaluation.flickr.flickr_eval import FlickrEvaluator
 from maskrcnn_benchmark.structures.bounding_box import BoxList
+from maskrcnn_benchmark.data.datasets.tsv import load_from_yaml_file
+from maskrcnn_benchmark.utils.miscellaneous import mkdir
+
 import matplotlib.pyplot as plt
 import matplotlib.pylab as pylab
-from maskrcnn_benchmark.data.datasets.tsv import load_from_yaml_file
+from PIL import Image
+import numpy as np
+
 def imshow(img, file_name = "tmp.jpg"):
     plt.imshow(img[:, :, [2, 1, 0]])
     plt.axis("off")
@@ -411,6 +416,9 @@ def inference(
 
     task = cfg.TEST.EVAL_TASK
 
+    if visualizer:
+        mkdir(os.path.join(output_folder,"visualize"))
+
     if not task:
         return inference_default(model, data_loader, dataset_name, iou_types, box_only, device, expected_results, expected_results_sigma_tol, output_folder, cfg)
         
@@ -484,14 +492,40 @@ def inference(
                         positive_map_label_to_token = all_positive_map_label_to_token[query_i]
                     elif task == "grounding":
                         captions = [t.get_field("caption") for t in targets]
-                        positive_map_eval = [t.get_field("positive_map_eval") for t in targets]
-                        if cfg.MODEL.RPN_ARCHITECTURE == "VLDYHEAD":
-                            plus = 1
-                        else:
-                            plus = 0
-                        assert(len(positive_map_eval) == 1) # Let's just use one image per batch
-                        positive_map_eval = positive_map_eval[0]
-                        positive_map_label_to_token = create_positive_map_label_to_token_from_positive_map(positive_map_eval, plus=plus)
+                        labels = [t.get_field("labels") for t in targets]
+                        # get token positions out, create tokenized caption, use create_positive_dict
+                        tokens_positive = [t.get_field("tokens_positive") for t in targets]
+                        
+                        # cum-detection: to ensure we're querying for all parts (not just  visible)
+                        try:
+                            label_positions = [t.get_field("label_positions") for t in targets]
+                        except KeyError:
+                            label_positions = None
+
+                        assert(len(tokens_positive)==1) # "Let's just use one image per batch" 
+                        # --presumably because all items in batch share the 
+                        # same label-to-token mapping for model output, which is
+                        #  a limitation when the captions vary.
+                        tokens_positive = tokens_positive[0]
+                        tokens = tokens_positive[0]
+                        labels = labels[0]
+                        if torch.is_tensor(labels):
+                            labels = labels.tolist()
+
+                        # Cover all labels
+                        if label_positions is not None:
+                            label_positions = label_positions[0]
+                            labels = list(label_positions.keys())
+                            tokens = [[label_positions[label]] for label in labels]
+
+                        # extra parameters (max_length, truncation) copied from
+                        # call within create_queries_and_maps (JJW)
+                        tokenized = dataset.prepare.tokenizer(captions[0],
+                                                              max_length=cfg.MODEL.LANGUAGE_BACKBONE.MAX_QUERY_LEN, 
+                                                              truncation=True,
+                                                              return_tensors="pt")
+                        _, positive_map_label_to_token = create_positive_dict(tokenized, tokens,
+                                                                              labels=labels)
                     output = model(images, captions=captions, positive_map=positive_map_label_to_token)
                     output = [o.to(cpu_device) for o in output]
 
@@ -544,24 +578,17 @@ def inference(
             image = load(image_path)
             no_background = True
             label_list = []
-            for index, i in enumerate(categories):
-                if not no_background or (i["name"] != "__background__" and i['id'] != 0):
-                    label_list.append(i["name"])
+            for index, cat in enumerate(categories):
+                if not no_background or (cat["name"] != "__background__" and cat['id'] != 0):
+                    label_list.append(cat["name"])
             visualizer.entities =  label_list
-            
             result, _ = visualizer.visualize_with_predictions(
                 image,
                 visualizer_input, 
-                threshold,
-                alpha=alpha,
-                box_pixel=box_pixel,
-                text_size=text_size,
-                text_pixel=text_pixel,
-                text_offset=text_offset,
-                text_offset_original=text_offset_original,
-                color=color,
+                thresh=0.5, # TODO(jjw) add config option(s) or find inferencer value
+                alpha=0.5
             )
-            imshow(result, "./visualize/img_{}.jpg".format(i))
+            imshow(result, os.path.join(output_folder,"visualize/img_{}.jpg".format(image_id)))
         
         if evaluator is not None:
             evaluator.update(mdetr_style_output)

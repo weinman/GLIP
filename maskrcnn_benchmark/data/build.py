@@ -54,7 +54,7 @@ def build_dataset(cfg, dataset_list, transforms, dataset_catalog, is_train=True,
             if cfg.MODEL.MASK_ON:
                 args["extra_fields"].append("mask")
 
-        if data["factory"] in ["CocoGrounding", "CocoDetectionTSV", "CaptionTSV", "MixedDataset", "FlickrDataset", "RefExpDataset", "GQADataset", "PseudoData", "PhrasecutDetection"]:
+        if data["factory"] in ["CocoGrounding", "CocoDetectionTSV", "CaptionTSV", "MixedDataset", "FlickrDataset", "RefExpDataset", "GQADataset", "PseudoData", "PhrasecutDetection", "ModulatedDataset"]:
             # args["return_masks"] = False
             args["return_masks"] = cfg.MODEL.MASK_ON
             args["return_tokens"] = True
@@ -342,6 +342,8 @@ def make_data_loader(cfg, is_train=True, is_distributed=False, num_replicas=None
         extra_args["use_od_data_aug"] = True
     if is_train and cfg.DATASETS.DISABLE_SHUFFLE:
         extra_args["disable_shuffle"] = True
+    if (not is_train) and cfg.DATASETS.TEST_DISABLE_SHUFFLE:
+        extra_args["disable_shuffle"] = True
     if cfg.DATASETS.ONE_HOT:
         extra_args["one_hot"] = True
     if is_train and len(cfg.DATASETS.PROMPT_VERSION) > 0:
@@ -352,8 +354,8 @@ def make_data_loader(cfg, is_train=True, is_distributed=False, num_replicas=None
         extra_args["disable_clip_to_image"] =  cfg.DATASETS.DISABLE_CLIP_TO_IMAGE
     if is_train and cfg.DATASETS.NO_MINUS_ONE_FOR_ONE_HOT:
         extra_args["no_minus_one_for_one_hot"] = cfg.DATASETS.NO_MINUS_ONE_FOR_ONE_HOT
-    if is_train:
-        extra_args["separation_tokens"] = cfg.DATASETS.SEPARATION_TOKENS
+
+    extra_args["separation_tokens"] = cfg.DATASETS.SEPARATION_TOKENS
     # caption
     if is_train and cfg.DATASETS.CAPTION_MIN_BOX > 0:
         extra_args["caption_min_box"] = cfg.DATASETS.CAPTION_MIN_BOX

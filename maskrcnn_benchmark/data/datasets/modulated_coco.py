@@ -19,6 +19,21 @@ from .od_to_grounding import convert_od_to_grounding_simple, check_for_positive_
 import pdb
 import json
 
+def nabird_class_complete_mirror(ind_to_class):
+    # Augment wing and eyes to make sure both captions are present (or
+    # neither) before a possible horizontal flip data augmentation
+    
+    # Do not need to handle cases when both or neither of the pairs are present
+    if 5 in ind_to_class and 6 not in ind_to_class:  # left eye --> right eye
+        ind_to_class[6] = ind_to_class[5].replace('left','right')
+    elif 6 in ind_to_class and 5 not in ind_to_class:  # right eye --> left eye
+        ind_to_class[5] = ind_to_class[6].replace('right','left')
+
+    if 11 in ind_to_class and 12 not in ind_to_class:  # left wing --> right wing
+        ind_to_class[12] = ind_to_class[11].replace('left','right')
+    elif 12 in ind_to_class and 11 not in ind_to_class:# right wing --> left wing
+        ind_to_class[11] = ind_to_class[12].replace('right','left')
+
 class CocoGrounding(torchvision.datasets.CocoDetection):
     def __init__(self,
                  img_folder,
@@ -102,7 +117,6 @@ class CocoGrounding(torchvision.datasets.CocoDetection):
         self.is_train = is_train
 
         self.ind_to_class = self.categories(no_background=False)
-
         self.disable_shuffle = disable_shuffle
         self.add_detection_prompt = add_detection_prompt
         self.one_hot = one_hot
@@ -129,15 +143,30 @@ class CocoGrounding(torchvision.datasets.CocoDetection):
 
     def __getitem__(self, idx):
         img, tgt = super(CocoGrounding, self).__getitem__(idx)
+        # NB: tgt will include any extra fields in the json annotation file
         image_id = self.ids[idx]
         tgt = [obj for obj in tgt if obj["iscrowd"] == 0]
         boxes = [obj["bbox"] for obj in tgt]
         boxes = torch.as_tensor(boxes).reshape(-1, 4)  # guard against no boxes
         target = BoxList(boxes, img.size, mode="xywh").convert("xyxy")
-        classes = [obj["category_id"] for obj in tgt]
+        classes = [obj["category_id"] for obj in tgt] # pos obj indices
         classes = [self.json_category_id_to_contiguous_id[c] for c in classes]
         classes = torch.tensor(classes)
         target.add_field("labels", classes)
+
+        # make class label text image-specific using the "name" field
+        ind_to_class = {} # don't just copy to init: catch missing L/R annotations
+        for obj in tgt:
+            if 'name' in obj:
+                ind_to_class[obj['category_id']] = obj['name']
+
+        # NAB hack: Fill missing L/R classes in case of hflip data augmentation.
+        nabird_class_complete_mirror(ind_to_class)
+
+        # Finally, round out any other missing class names
+        for (k,v) in self.ind_to_class.items():
+            if k not in ind_to_class:
+                ind_to_class[k] = v 
 
         if self.return_masks:
             masks = []
@@ -156,7 +185,13 @@ class CocoGrounding(torchvision.datasets.CocoDetection):
         
         if not self.disable_clip_to_image:
             target = target.clip_to_image(remove_empty=True)
-        
+
+        # Transform **before** subsequent (label/target/caption) processing
+        # this enables target manipulations to percolate
+        if self._transforms is not None:
+            img, target = self._transforms(img, target)
+
+
         if self.special_safeguard_for_coco_grounding:
             # Intended for LVIS
             assert(not self.use_caption_prompt)
@@ -169,7 +204,7 @@ class CocoGrounding(torchvision.datasets.CocoDetection):
             annotations, caption, greenlight_span_for_masked_lm_objective, label_to_positions = convert_object_detection_to_grounding_optimized_for_od(
                 target=target,
                 image_id=image_id,
-                ind_to_class=self.ind_to_class,
+                ind_to_class=ind_to_class, # now made image-specific
                 disable_shuffle=self.disable_shuffle,
                 add_detection_prompt=False,
                 add_detection_prompt_advanced=False,
@@ -184,10 +219,10 @@ class CocoGrounding(torchvision.datasets.CocoDetection):
             )
         else:
             # Intended for COCO / ODinW
-            annotations, caption, greenlight_span_for_masked_lm_objective = convert_od_to_grounding_simple(
+            annotations, caption, label_to_positions, greenlight_span_for_masked_lm_objective = convert_od_to_grounding_simple(
                 target=target,
                 image_id=image_id,
-                ind_to_class=self.ind_to_class,
+                ind_to_class=ind_to_class, # now made image-specific
                 disable_shuffle=self.disable_shuffle,
                 add_detection_prompt=self.add_detection_prompt,
                 separation_tokens=self.separation_tokens,
@@ -200,6 +235,7 @@ class CocoGrounding(torchvision.datasets.CocoDetection):
             anno["greenlight_span_for_masked_lm_objective"].append((-1, -1, -1))
         img, anno = self.prepare(img, anno, box_format="xyxy")
 
+        anno["label_positions"] = label_to_positions
         # for equivalence check
         if self.one_hot:
             logging.info("using one hot for equivalence check.")
@@ -217,9 +253,6 @@ class CocoGrounding(torchvision.datasets.CocoDetection):
                 text_mask[:len(self.ind_to_class)] = 1
             anno["positive_map"] = one_hot_map
             anno["text_mask"] = text_mask
-
-        if self._transforms is not None:
-            img, target = self._transforms(img, target)
 
         # add additional property
         for ann in anno:
@@ -269,6 +302,13 @@ class ModulatedDataset(torchvision.datasets.CocoDetection):
         self.is_train = is_train
         self.disable_clip_to_image = disable_clip_to_image
         self.no_mask_for_gold = no_mask_for_gold
+        
+        self.json_category_id_to_contiguous_id = {
+            v: i + 1 for i, v in enumerate(self.coco.getCatIds())
+        }
+        self.contiguous_category_id_to_json_id = {
+            v: k for k, v in self.json_category_id_to_contiguous_id.items()
+        } # copied from CocoGrounding
 
     def __getitem__(self, idx):
         img, target = super(ModulatedDataset, self).__getitem__(idx)
@@ -320,6 +360,8 @@ class ModulatedDataset(torchvision.datasets.CocoDetection):
             tokenized = self.prepare.tokenizer(caption, return_tensors="pt")
             target.add_field("positive_map_eval", create_positive_map(tokenized, coco_img["tokens_positive_eval"]))
             target.add_field("nb_eval", len(target.get_field("positive_map_eval")))
+        elif "tokens" in coco_img and not self.is_train:
+            target.add_field("tokens_positive",coco_img["tokens"]) # TODO(jjw) make json contain the same field name?
 
         sanity_check_target_after_processing(target)
         return img, target, idx
@@ -407,7 +449,12 @@ class ConvertCocoPolysToMask(object):
         return [[x1, y1, x1, y2, x2, y2, x2, y1]]
 
     def __call__(self, image, target, ignore_box_screen=False, box_format="xywh"):
-        w, h = image.size
+        if torch.is_tensor(image):
+            image_size = (image.size(2), image.size(1)) # CHW
+        else:
+            image_size = image.size
+        w, h = image_size
+
 
         image_id = target["image_id"]
         image_id = torch.tensor([image_id])
@@ -439,9 +486,9 @@ class ConvertCocoPolysToMask(object):
                     masks.append(obj["segmentation"])
                     is_box_mask.append(0)
                 else:
-                    masks.append(self.get_box_mask(bbox, image.size, mode='poly'))
+                    masks.append(self.get_box_mask(bbox, image_size, mode='poly'))
                     is_box_mask.append(1)
-            masks = SegmentationMask(masks, image.size, mode='poly')
+            masks = SegmentationMask(masks, image_size, mode='poly')
             is_box_mask = torch.tensor(is_box_mask)
 
         keypoints = None

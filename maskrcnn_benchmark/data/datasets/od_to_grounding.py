@@ -98,7 +98,7 @@ def convert_od_to_grounding_simple(
             new_target.append(new_target_i)
             greenlight_span_for_masked_lm_objective.append(label_to_positions[label_i])
 
-    return new_target, pheso_caption, greenlight_span_for_masked_lm_objective
+    return new_target, pheso_caption, label_to_positions, greenlight_span_for_masked_lm_objective
 
 
 def check_for_positive_overflow(target, ind_to_class, tokenizer, max_seq_length=256):

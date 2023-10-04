@@ -10,6 +10,7 @@ import torch
 from maskrcnn_benchmark.config import cfg
 from maskrcnn_benchmark.data import make_data_loader
 from maskrcnn_benchmark.engine.inference import inference
+from maskrcnn_benchmark.engine.predictor_glip import GLIPDemo
 from maskrcnn_benchmark.modeling.detector import build_detection_model
 from maskrcnn_benchmark.utils.checkpoint import DetectronCheckpointer
 from maskrcnn_benchmark.utils.collect_env import collect_env_info
@@ -70,6 +71,13 @@ def setup_for_distributed(is_master):
 
     __builtin__.print = print
 
+def get_visualizer(cfg,model):
+    visualizer = GLIPDemo(cfg,
+                          min_image_size=cfg.INPUT.MIN_SIZE_TEST,
+                          load_model=False)
+    visualizer.model = model
+    return visualizer
+
 def main():
     parser = argparse.ArgumentParser(description="PyTorch Detection to Grounding Inference")
     parser.add_argument(
@@ -95,7 +103,7 @@ def main():
     parser.add_argument("--dist-url", default="env://", help="url used to set up distributed training")
 
     parser.add_argument("--task_config", default=None)
-
+    parser.add_argument("--visualize", action=argparse.BooleanOptionalAction, default=False, help="produce visualizations")
     args = parser.parse_args()
 
     num_gpus = int(os.environ["WORLD_SIZE"]) if "WORLD_SIZE" in os.environ else 1
@@ -139,11 +147,14 @@ def main():
     #                                           input_constructor=lambda x: {'images': [torch.rand(x).cuda()]})
     # print("FLOPs: {}, #Parameter: {}".format(params, flops))
 
+    
     checkpointer = DetectronCheckpointer(cfg, model, save_dir=cfg.OUTPUT_DIR)
     if args.weight:
         _ = checkpointer.load(args.weight, force=True)
     else:
         _ = checkpointer.load(cfg.MODEL.WEIGHT)
+
+    visualizer = get_visualizer(cfg,model) if args.visualize else None
 
     if args.task_config:
         all_task_configs = args.task_config.split(",")
@@ -179,6 +190,7 @@ def main():
                         expected_results=cfg_.TEST.EXPECTED_RESULTS,
                         expected_results_sigma_tol=cfg_.TEST.EXPECTED_RESULTS_SIGMA_TOL,
                         output_folder=output_folder,
+                        visualizer=visualizer,
                         cfg=cfg_
                     )
                     synchronize()
@@ -212,6 +224,7 @@ def main():
                     expected_results=cfg.TEST.EXPECTED_RESULTS,
                     expected_results_sigma_tol=cfg.TEST.EXPECTED_RESULTS_SIGMA_TOL,
                     output_folder=output_folder,
+                    visualizer=visualizer,
                     cfg=cfg
                 )
                 synchronize()
