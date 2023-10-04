@@ -4,7 +4,7 @@
 
 This fork contains the GLIPv1-L modifications used to train the atributes-enhanced model for the paper:
 
-    Weinman, J., Belongie, S., Frank, S. (2023). Descriptive Attributes for Language-Based Object Keypoint Detection. In: Christensen, H.I., Corke, P., Detry, R., Weibel, JB., Vincze, M. (eds) Computer Vision Systems. ICVS 2023. Lecture Notes in Computer Science, vol 14253. Springer, Cham. https://doi.org/10.1007/978-3-031-44137-0_37
+Weinman, J., Belongie, S., Frank, S. (2023). Descriptive Attributes for Language-Based Object Keypoint Detection. In: Christensen, H.I., Corke, P., Detry, R., Weibel, JB., Vincze, M. (eds) Computer Vision Systems. ICVS 2023. Lecture Notes in Computer Science, vol 14253. Springer, Cham. https://doi.org/10.1007/978-3-031-44137-0_37
 
 The network was trained with the following command:
 
@@ -25,6 +25,21 @@ python tools/finetune.py           \
     SOLVER.BASE_LR                            1e-5                               \
     SOLVER.LANG_LR                            1e-5                               \
     SOLVER.GAMMA                              5e-1
+```
+
+Use of this derivative work may cite the following paper (in addition to the original):
+
+```
+@InProceedings{10.1007/978-3-031-44137-0_37,
+author="Weinman, Jerod and Belongie, Serge and Frank, Stella",
+editor="Christensen, Henrik I. and Corke, Peter and Detry, Renaud and Weibel, Jean-Baptiste and Vincze, Markus",
+title="Descriptive Attributes for Language-Based Object Keypoint Detection",
+booktitle="Computer Vision Systems",
+year="2023",
+publisher="Springer Nature Switzerland",
+address="Cham",
+pages="444--458"
+}
 ```
 
 <img src="docs/lead.png" width="800"> 
